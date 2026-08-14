@@ -64,9 +64,17 @@ class MangaBakaMetadataMapper(
         val mainTitle = SeriesTitle(series.title, null, null)
 
         val otherTitles: List<SeriesTitle> = if (!series.titles.isNullOrEmpty()) {
-            // titles v2: use the language code and traits provided per title so
-            // that language-based selection resolves to the correct title.
-            series.titles
+            // titles v2: MangaBaka flags one primary per language/script, so a
+            // bare is_primary filter pulls in every localized primary (Spanish,
+            // Russian, Thai, ...). Keep only the primary native, primary romanized
+            // and primary English titles.
+            val primaries = series.titles.filter { it.isPrimary == true }
+            listOfNotNull(
+                primaries.firstOrNull { it.titleType() == TitleType.NATIVE },
+                primaries.firstOrNull { it.titleType() == ROMAJI },
+                primaries.firstOrNull { it.isEnglish() },
+            )
+                .distinctBy { it.title }
                 .filter { it.title != series.title }
                 .map { title -> SeriesTitle(title.title, title.titleType(), title.language) }
         } else {
@@ -154,5 +162,12 @@ class MangaBakaMetadataMapper(
             isRomanized -> ROMAJI
             else -> TitleType.LOCALIZED
         }
+    }
+
+    // MangaBaka tags English titles with a plain "en" (or region-suffixed
+    // "en-*") language code; the primary one is the official localized title.
+    private fun MangaBakaTitle.isEnglish(): Boolean {
+        val lang = language?.lowercase() ?: return false
+        return lang == "en" || lang.startsWith("en-")
     }
 }
