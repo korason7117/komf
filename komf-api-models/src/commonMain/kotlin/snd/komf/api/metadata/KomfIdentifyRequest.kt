@@ -8,8 +8,9 @@ import snd.komf.api.KomfServerSeriesId
 
 @Serializable
 data class KomfIdentifyRequest(
-    val libraryId: KomfServerLibraryId?,
+    val libraryId: KomfServerLibraryId? = null,
     val seriesId: KomfServerSeriesId,
     val provider: KomfProviders,
     val providerSeriesId: KomfProviderSeriesId,
 )
+

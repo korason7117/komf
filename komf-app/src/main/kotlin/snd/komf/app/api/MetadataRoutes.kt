@@ -45,9 +45,11 @@ class MetadataRoutes(
             identifySeriesRoute()
 
             matchSeriesRoute()
+            matchSeriesOnlyRoute()
             matchLibraryRoute()
 
             resetSeriesRoute()
+            resetSeriesOnlyRoute()
             resetLibraryRoute()
         }
     }
@@ -108,7 +110,12 @@ class MetadataRoutes(
 
     private fun Route.getSeriesCoverRoute() {
         get("/series-cover") {
-            val libraryId = MediaServerLibraryId(call.request.queryParameters.getOrFail("libraryId"))
+            val seriesId = call.request.queryParameters["seriesId"]?.let { MediaServerSeriesId(it) }
+            val libraryId = call.request.queryParameters["libraryId"]
+                ?.let { MediaServerLibraryId(it) }
+                ?: seriesId?.let { mediaServerClient.first().getSeries(it).libraryId }
+                ?: return@get call.response.status(HttpStatusCode.BadRequest)
+
             val provider = CoreProviders.valueOf(call.request.queryParameters.getOrFail("provider"))
             val providerSeriesId = ProviderSeriesId(call.request.queryParameters.getOrFail("providerSeriesId"))
 
@@ -187,6 +194,33 @@ class MetadataRoutes(
             metadataServiceProvider.first().updateServiceFor(libraryId.value)
                 .resetLibraryMetadata(libraryId, removeComicInfo)
             call.response.status(HttpStatusCode.NoContent)
+        }
+    }
+
+    private fun Route.matchSeriesOnlyRoute() {
+        post("/match/series/{seriesId}") {
+            val seriesId = MediaServerSeriesId(call.parameters.getOrFail("seriesId"))
+            val libraryId = mediaServerClient.first().getSeries(seriesId).libraryId.value
+            val jobId = metadataServiceProvider.first().metadataServiceFor(libraryId).matchSeriesMetadata(seriesId)
+
+            call.respond(
+                KomfMetadataJobResponse(KomfMetadataJobId(jobId.value.toString()))
+            )
+        }
+    }
+
+    private fun Route.resetSeriesOnlyRoute() {
+        post("/reset/series/{seriesId}") {
+            val seriesId = MediaServerSeriesId(call.parameters.getOrFail("seriesId"))
+            val libraryId = mediaServerClient.first().getSeries(seriesId).libraryId.value
+            val removeComicInfo = call.queryParameters["removeComicInfo"].toBoolean()
+            try {
+                metadataServiceProvider.first().updateServiceFor(libraryId).resetSeriesMetadata(seriesId, removeComicInfo)
+            } catch (e: ComicInfoException) {
+                call.respond(HttpStatusCode.UnprocessableEntity, KomfErrorResponse(e.message))
+                return@post
+            }
+            call.respond(HttpStatusCode.NoContent, "")
         }
     }
 

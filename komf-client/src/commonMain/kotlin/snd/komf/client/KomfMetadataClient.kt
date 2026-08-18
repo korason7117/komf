@@ -39,20 +39,22 @@ class KomfMetadataClient(
     }
 
     suspend fun getSeriesCover(
-        libraryId: KomfServerLibraryId,
+        libraryId: KomfServerLibraryId? = null,
+        seriesId: KomfServerSeriesId? = null,
         provider: KomfProviders,
         providerSeriesId: KomfProviderSeriesId
     ): ByteArray? {
         return try {
             ktor.get("$metadataApiPrefix/series-cover") {
-                parameter("libraryId", libraryId)
+                libraryId?.let { parameter("libraryId", it.value) }
+                seriesId?.let { parameter("seriesId", it.value) }
                 parameter(
                     "provider", when (provider) {
                         is UnknownKomfProvider -> provider.name
                         else -> provider.toString()
                     }
                 )
-                parameter("providerSeriesId", providerSeriesId)
+                parameter("providerSeriesId", providerSeriesId.value)
             }.body()
 
         } catch (exception: ClientRequestException) {
@@ -72,22 +74,26 @@ class KomfMetadataClient(
     }
 
     suspend fun matchSeries(
-        libraryId: KomfServerLibraryId,
+        libraryId: KomfServerLibraryId? = null,
         seriesId: KomfServerSeriesId
     ): KomfMetadataJobResponse {
-        return ktor.post("$metadataApiPrefix/match/library/$libraryId/series/$seriesId").body()
+        val url = if (libraryId != null) "$metadataApiPrefix/match/library/${libraryId.value}/series/${seriesId.value}"
+        else "$metadataApiPrefix/match/series/${seriesId.value}"
+        return ktor.post(url).body()
     }
 
     suspend fun matchLibrary(libraryId: KomfServerLibraryId) {
-        ktor.post("$metadataApiPrefix/match/library/$libraryId")
+        ktor.post("$metadataApiPrefix/match/library/${libraryId.value}")
     }
 
     suspend fun resetSeries(
-        libraryId: KomfServerLibraryId,
+        libraryId: KomfServerLibraryId? = null,
         seriesId: KomfServerSeriesId,
         removeComicInfo: Boolean = false
     ) {
-        ktor.post("$metadataApiPrefix/reset/library/$libraryId/series/$seriesId") {
+        val url = if (libraryId != null) "$metadataApiPrefix/reset/library/${libraryId.value}/series/${seriesId.value}"
+        else "$metadataApiPrefix/reset/series/${seriesId.value}"
+        ktor.post(url) {
             parameter("removeComicInfo", removeComicInfo)
         }
     }
@@ -96,7 +102,7 @@ class KomfMetadataClient(
         libraryId: KomfServerLibraryId,
         removeComicInfo: Boolean = false
     ) {
-        ktor.post("$metadataApiPrefix/reset/library/$libraryId") {
+        ktor.post("$metadataApiPrefix/reset/library/${libraryId.value}") {
             parameter("removeComicInfo", removeComicInfo)
         }
     }

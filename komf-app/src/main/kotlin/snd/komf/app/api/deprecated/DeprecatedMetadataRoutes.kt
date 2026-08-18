@@ -38,8 +38,10 @@ class DeprecatedMetadataRoutes(
                 searchSeriesRoute()
                 identifySeriesRoute()
                 matchSeriesRoute()
+                matchSeriesOnlyRoute()
                 matchLibraryRoute()
                 resetSeriesRoute()
+                resetSeriesOnlyRoute()
                 resetLibraryRoute()
             }
         }
@@ -139,6 +141,29 @@ class DeprecatedMetadataRoutes(
             val removeComicInfo = call.queryParameters["removeComicInfo"].toBoolean()
             metadataServiceProvider.first().updateServiceFor(libraryId.value)
                 .resetLibraryMetadata(libraryId, removeComicInfo)
+            call.response.status(HttpStatusCode.NoContent)
+        }
+    }
+
+    private fun Route.matchSeriesOnlyRoute() {
+        post("/match/series/{seriesId}") {
+            val seriesId = MediaServerSeriesId(call.parameters.getOrFail("seriesId"))
+            val libraryId = mediaServerClient.first().getSeries(seriesId).libraryId.value
+            val jobId = metadataServiceProvider.first().metadataServiceFor(libraryId).matchSeriesMetadata(seriesId)
+            jobTracker.first().getMetadataJobEvents(jobId)
+                ?.takeWhile { it != CompletionEvent }
+                ?.collect {}
+
+            call.response.status(HttpStatusCode.NoContent)
+        }
+    }
+
+    private fun Route.resetSeriesOnlyRoute() {
+        post("/reset/series/{seriesId}") {
+            val seriesId = MediaServerSeriesId(call.parameters.getOrFail("seriesId"))
+            val libraryId = mediaServerClient.first().getSeries(seriesId).libraryId.value
+            val removeComicInfo = call.queryParameters["removeComicInfo"].toBoolean()
+            metadataServiceProvider.first().updateServiceFor(libraryId).resetSeriesMetadata(seriesId, removeComicInfo)
             call.response.status(HttpStatusCode.NoContent)
         }
     }
