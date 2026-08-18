@@ -53,7 +53,7 @@ jobs:
           generate_release_notes: true
           files: komf-app/build/libs/komf-${{ steps.ver.outputs.version }}.jar
 
-      # ---- Docker image: ghcr.io/loocool2/komf ----
+      # ---- Docker image: ghcr.io/korason7117/komf ----
 
       - uses: docker/setup-qemu-action@v3
 
@@ -75,7 +75,7 @@ jobs:
           build-args: |
             KOMF_VERSION=${{ steps.ver.outputs.version }}
           tags: |
-            ghcr.io/loocool2/komf:${{ steps.ver.outputs.version }}
-            ghcr.io/loocool2/komf:latest
+            ghcr.io/korason7117/komf:${{ steps.ver.outputs.version }}
+            ghcr.io/korason7117/komf:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
