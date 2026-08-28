@@ -10,7 +10,6 @@ group = "io.github.snd-r"
 version = (findProperty("komfVersion") as String?) ?: libs.versions.app.version.get()
 
 kotlin {
-    jvmToolchain(17)
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
     }

@@ -22,19 +22,15 @@ class MangaBakaMetadataProvider(
     private val dataSource: MangaBakaDataSource,
     private val metadataMapper: MangaBakaMetadataMapper,
     private val nameMatcher: NameSimilarityMatcher,
-    private val coverFetchClient: HttpClient,
-    private val fetchSeriesCovers: Boolean,
+    private val coverFetchClient: HttpClient?,
     mediaType: MediaType,
 ) : MetadataProvider {
-    private val seriesTypes: List<MangaBakaType> = when (mediaType) {
-        MediaType.MANGA -> listOf(
-            MangaBakaType.MANGA,
-            MangaBakaType.MANHWA,
-            MangaBakaType.MANHUA,
-            MangaBakaType.OEL,
-            MangaBakaType.OTHER
-        )
-
+    private val typeExcludes: List<MangaBakaType>? = when (mediaType) {
+        MediaType.MANGA -> listOf(MangaBakaType.NOVEL)
+        else -> null
+    }
+    private val typeIncludes: List<MangaBakaType>? = when (mediaType) {
+        MediaType.MANGA -> null
         MediaType.NOVEL -> listOf(MangaBakaType.NOVEL)
         MediaType.COMIC -> listOf(MangaBakaType.OEL, MangaBakaType.OTHER)
         MediaType.WEBTOON -> listOf(MangaBakaType.MANHUA, MangaBakaType.MANHWA)
@@ -49,7 +45,7 @@ class MangaBakaMetadataProvider(
     override suspend fun getSeriesMetadata(seriesId: ProviderSeriesId): ProviderSeriesMetadata {
         val id = seriesId.toMangaBakaId()
         val series = cache.get(id) { dataSource.getSeries(id) }
-        val cover = if (fetchSeriesCovers) fetchCover(series) else null
+        val cover = fetchCover(series)
 
         return metadataMapper.toSeriesMetadata(series, cover)
     }
@@ -73,7 +69,8 @@ class MangaBakaMetadataProvider(
     ): Collection<SeriesSearchResult> {
         val results = dataSource.search(
             title = seriesName,
-            types = seriesTypes,
+            types = typeIncludes,
+            typesNot = typeExcludes,
         )
         results.forEach { cache.put(it.id, it) }
 
@@ -82,33 +79,25 @@ class MangaBakaMetadataProvider(
 
     override suspend fun matchSeriesMetadata(matchQuery: MatchQuery): ProviderSeriesMetadata? {
         val seriesName = matchQuery.seriesName
-        val searchResults = dataSource.search(seriesName.take(400), seriesTypes)
+        val searchResults = dataSource.search(
+            title = seriesName.take(400),
+            types = typeIncludes,
+            typesNot = typeExcludes
+        )
         searchResults.forEach { cache.put(it.id, it) }
 
         val match = searchResults.firstOrNull { series ->
-            val secondaryTitles = series.secondaryTitles
-                ?.flatMap { titles -> titles.value?.map { it.title } ?: emptyList() }
-                ?: emptyList()
-
-            val titles = listOfNotNull(
-                series.title,
-                series.nativeTitle,
-                series.romanizedTitle,
-            ) + secondaryTitles + (series.titles?.map { it.title } ?: emptyList())
-
+            val titles = series.titles?.map { it.title } ?: emptyList()
             nameMatcher.matches(seriesName, titles)
         }
 
-        return match?.let { series ->
-            val cover = if (fetchSeriesCovers) fetchCover(series) else null
-            metadataMapper.toSeriesMetadata(series, cover)
-        }
+        return match?.let { series -> metadataMapper.toSeriesMetadata(series, fetchCover(series)) }
     }
 
     private suspend fun fetchCover(series: MangaBakaSeries): Image? {
-        val coverUrl = series.cover.thumbnailUrl() ?: return null
+        if (coverFetchClient == null || series.cover.x350?.x1 == null) return null
 
-        val response = coverFetchClient.get(coverUrl)
+        val response = coverFetchClient.get(series.cover.x350.x1)
         return Image(
             response.body(),
             response.contentType()?.let { "${it.contentType}/${it.contentSubtype}" }

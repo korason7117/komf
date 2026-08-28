@@ -2,6 +2,7 @@ package snd.komf.providers.mangabaka
 
 import com.fleeksoft.ksoup.Ksoup
 import io.ktor.http.parseUrl
+import kotlinx.datetime.number
 import snd.komf.model.Author
 import snd.komf.model.AuthorRole
 import snd.komf.model.Image
@@ -15,11 +16,11 @@ import snd.komf.model.SeriesSearchResult
 import snd.komf.model.SeriesStatus
 import snd.komf.model.SeriesTitle
 import snd.komf.model.TitleType
-import snd.komf.model.TitleType.ROMAJI
 import snd.komf.model.WebLink
 import snd.komf.providers.CoreProviders
 import snd.komf.providers.MetadataConfigApplier
 import snd.komf.providers.SeriesMetadataConfig
+import snd.komf.providers.mangabaka.MangaBakaTitleTrait.NATIVE
 import snd.komf.util.toStingEncoded
 
 
@@ -51,72 +52,39 @@ class MangaBakaMetadataMapper(
             ?.map { Publisher(it, PublisherType.LOCALIZED, "en") }?.toSet()
             ?: emptySet()
 
-        val originalLanguage = when (series.type) {
-            MangaBakaType.MANGA -> "ja"
-            MangaBakaType.NOVEL -> null
-            MangaBakaType.MANHWA -> "ko"
-            MangaBakaType.MANHUA -> "zh"
-            MangaBakaType.OEL -> "en"
-            MangaBakaType.OTHER -> null
-        }
-        // The main title always stays first so that title selection keeps
-        // choosing it when no preferred language is configured.
-        val mainTitle = SeriesTitle(series.title, null, null)
 
-        val otherTitles: List<SeriesTitle> = if (!series.titles.isNullOrEmpty()) {
-            // titles v2: MangaBaka flags one primary per language/script, so a
-            // bare is_primary filter pulls in every localized primary (Spanish,
-            // Russian, Thai, ...). Keep only the primary native, primary romanized
-            // and primary English titles.
-            val primaries = series.titles.filter { it.isPrimary == true }
-            listOfNotNull(
-                primaries.firstOrNull { it.titleType() == TitleType.NATIVE },
-                primaries.firstOrNull { it.titleType() == ROMAJI },
-                primaries.firstOrNull { it.isEnglish() },
-            )
-                .distinctBy { it.title }
-                .filter { it.title != series.title }
-                .map { title -> SeriesTitle(title.title, title.titleType(), title.language) }
-        } else {
-            // Legacy fallback (DB mode, which has no titles v2 array).
-            val legacyTitles = listOfNotNull(
-                series.nativeTitle?.let { SeriesTitle(it, TitleType.NATIVE, originalLanguage) },
-                series.romanizedTitle?.let {
-                    when (originalLanguage) {
-                        "ja" -> SeriesTitle(it, ROMAJI, "ja-ro")
-                        "ko" -> SeriesTitle(it, ROMAJI, "ko-ro")
-                        "zh" -> SeriesTitle(it, ROMAJI, "zh-ro")
-                        else -> null
-                    }
-                }
-            )
-            val secondaryTitles = series.secondaryTitles?.flatMap { (language, titles) ->
-                val titleType = when (language) {
-                    originalLanguage -> TitleType.NATIVE
-                    "ja-ro", "ko-ro", "zh-ro" -> ROMAJI
+        val allTitles = series.titles?.sortedByDescending { it.isPrimary } ?: emptyList()
+        val nativeTitle = allTitles.firstOrNull { title ->
+            title.traits.any { it == NATIVE } && !title.language.endsWith("-Latn")
+        }
+        val titles = allTitles.sortedByDescending { it.isPrimary }.map { title ->
+            val romanized = title.title.endsWith("-Latn")
+            SeriesTitle(
+                name = title.title,
+                type = when {
+                    title == nativeTitle -> TitleType.NATIVE
+                    romanized -> TitleType.ROMAJI
                     else -> TitleType.LOCALIZED
-                }
-                titles?.map { SeriesTitle(it.title, titleType, language) } ?: emptyList()
-            } ?: emptyList()
-            legacyTitles + secondaryTitles
+                },
+                language = title.language.replace("-Latn", "-ro")
+            )
         }
-
-        val titles = listOf(mainTitle) + otherTitles
 
         val publisher = if (metadataConfig.useOriginalPublisher) originalPublishers.firstOrNull()
         else englishPublishers.firstOrNull() ?: originalPublishers.firstOrNull()
 
-        val links = (series.links ?: emptyList()).mapNotNull { link ->
-            when {
-                link.startsWith("https://anilist.co") -> WebLink("AniList", link)
-                link.startsWith("https://kitsu.app") -> WebLink("Kitsu", link)
-                link.startsWith("https://myanimelist.net") -> WebLink("MyAnimeList", link)
-                link.startsWith("https://www.anime-planet.com") -> WebLink("Anime-Planet", link)
-                link.startsWith("https://www.novelupdates.com") -> WebLink("NovelUpdates", link)
-                link.startsWith("https://mangabaka.org") -> WebLink("MangaBaka", link)
-                else -> parseUrl(link)?.let { url -> WebLink(url.host.removePrefix("www."), url.toStingEncoded()) }
+        val links = series.linksV2?.mapNotNull { link ->
+            parseUrl(link.url)?.let { url ->
+                WebLink(
+                    link.nameDisplay,
+                    url.toStingEncoded()
+                )
             }
-        }.sortedBy { it.label }
+        }?.sortedBy { it.label } ?: emptyList()
+
+        val allTags = series.tagsV2 ?: emptyList()
+        val genres = allTags.filter { it.isGenre }.map { it.name }
+        val tags = allTags.filterNot { it.isGenre }.map { it.name }
 
         val metadata = SeriesMetadata(
             status = status,
@@ -124,12 +92,16 @@ class MangaBakaMetadataMapper(
             summary = series.description?.let { Ksoup.parse(it).wholeText() },
             publisher = publisher,
             alternativePublishers = (originalPublishers + englishPublishers) - setOfNotNull(publisher),
-            genres = series.genres?.sorted() ?: emptyList(),
-            tags = series.tags?.sorted() ?: emptyList(),
+            genres = genres,
+            tags = tags,
             totalBookCount = series.finalVolume?.toIntOrNull(),
             authors = authors + artists,
             thumbnail = thumbnail,
-            releaseDate = ReleaseDate(series.year, null, null),
+            releaseDate = ReleaseDate(
+                series.published?.startDate?.year,
+                series.published?.startDate?.month?.number,
+                series.published?.startDate?.day
+            ),
             links = links,
             score = series.rating
         )
@@ -143,31 +115,20 @@ class MangaBakaMetadataMapper(
     fun toSeriesSearchResult(series: MangaBakaSeries): SeriesSearchResult {
         return SeriesSearchResult(
             url = series.url(),
-            imageUrl = series.cover.thumbnailUrl(),
-            title = series.title,
+            imageUrl = series.cover.x350?.x1,
+            title = getPrimaryTitle(series),
             provider = CoreProviders.MANGA_BAKA,
             resultId = series.id.value.toString()
         )
     }
 
-    // A romanized native title is carried as a Latin-script language subtag
-    // (e.g. "ko-Latn"); a non-Latin native trait maps to NATIVE, everything
-    // else is treated as a localized title.
-    private fun MangaBakaTitle.titleType(): TitleType {
-        val isRomanized = traits.contains("romanized") ||
-                language?.contains("-Latn", ignoreCase = true) == true
-        return when {
-            traits.contains("native") && isRomanized -> ROMAJI
-            traits.contains("native") -> TitleType.NATIVE
-            isRomanized -> ROMAJI
-            else -> TitleType.LOCALIZED
-        }
-    }
+    private fun getPrimaryTitle(series: MangaBakaSeries): String {
+        if (series.titles == null) return ""
+        val nativeTitle = series.titles.firstOrNull { title -> title.traits.any { it == NATIVE } }
+        if (nativeTitle != null) return nativeTitle.title
+        val primaryEnglish = series.titles.firstOrNull { it.language == "en" && it.isPrimary == true }
+        if (primaryEnglish != null) return primaryEnglish.title
 
-    // MangaBaka tags English titles with a plain "en" (or region-suffixed
-    // "en-*") language code; the primary one is the official localized title.
-    private fun MangaBakaTitle.isEnglish(): Boolean {
-        val lang = language?.lowercase() ?: return false
-        return lang == "en" || lang.startsWith("en-")
+        return series.titles.first().title
     }
 }

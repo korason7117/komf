@@ -142,10 +142,7 @@ class MangaBakaDbDownloader(
                     CREATE VIRTUAL TABLE series_fts USING fts5
                     (
                         id,
-                        title,
-                        native_title,
-                        romanized_title,
-                        secondary_titles_en,
+                        titles,
                         type,
                         tokenize = 'trigram'
                     );
@@ -156,24 +153,11 @@ class MangaBakaDbDownloader(
                 """
                     INSERT INTO series_fts
                     SELECT s.id,
-                           s.title,
-                           s.native_title,
-                           s.romanized_title,
                            GROUP_CONCAT(json_extract(json_each.value, '$.title'), ', '),
                            s.type
-                    FROM series s, json_each(secondary_titles_en)
+                    FROM series s, json_each(titles)
                     WHERE state = 'active'
-                    GROUP BY s.id
-                    UNION
-                    SELECT id,
-                           title,
-                           native_title,
-                           romanized_title,
-                           null,
-                           type
-                    FROM series
-                    WHERE state = 'active'
-                      AND secondary_titles_en is null;
+                    GROUP BY s.id;
                 """.trimIndent()
             )
         }
