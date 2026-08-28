@@ -12,17 +12,13 @@ enum class CoreProviders {
     @Deprecated("Unmaintained. Untested")
     BANGUMI,
 
-
-    @Deprecated("Unmaintained. Untested")
     YEN_PRESS,
 
-    @Deprecated("Unmaintained. Untested")
     VIZ,
 
     @Deprecated("Unmaintained. Untested")
     WEBTOONS,
 
-    @Deprecated("removed")
     KODANSHA,
 
     @Deprecated("removed")

@@ -646,7 +646,6 @@ class ProvidersModule(
             ),
             nameMatcher = config.nameMatchingMode?.let { nameSimilarityMatcher(it) } ?: defaultNameMatcher,
             coverFetchClient = coverFetchClient,
-            fetchSeriesCovers = config.seriesMetadata.thumbnail,
             mediaType = config.mediaType
         )
     }
