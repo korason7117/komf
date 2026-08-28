@@ -81,6 +81,7 @@ class MangaBakaMetadataMapper(
                 )
             }
         }?.sortedBy { it.label } ?: emptyList()
+        val allLinks = listOf(WebLink("MangaBaka", series.url())) + links
 
         val allTags = series.tagsV2 ?: emptyList()
         val genres = allTags.filter { it.isGenre }.map { it.name }
@@ -102,7 +103,7 @@ class MangaBakaMetadataMapper(
                 series.published?.startDate?.month?.number,
                 series.published?.startDate?.day
             ),
-            links = links,
+            links = allLinks,
             score = series.rating
         )
 
