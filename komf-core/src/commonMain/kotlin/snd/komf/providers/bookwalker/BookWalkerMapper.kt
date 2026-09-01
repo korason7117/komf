@@ -1,5 +1,6 @@
 package snd.komf.providers.bookwalker
 
+import com.fleeksoft.ksoup.Ksoup
 import kotlinx.datetime.number
 import snd.komf.model.Author
 import snd.komf.model.AuthorRole
@@ -75,7 +76,7 @@ class BookWalkerMapper(
         val metadata = SeriesMetadata(
             status = series.status(),
             titles = titles,
-            summary = series.description ?: firstBook?.synopsis,
+            summary = (series.description ?: firstBook?.synopsis)?.stripHtml(),
             publisher = (series.imprint ?: series.publisher)
                 ?.let { Publisher(it, PublisherType.LOCALIZED) },
             genres = series.genres,
@@ -110,7 +111,7 @@ class BookWalkerMapper(
     fun toBookMetadata(book: BookWalkerBook, thumbnail: Image? = null): ProviderBookMetadata {
         val metadata = BookMetadata(
             title = book.name,
-            summary = book.synopsis,
+            summary = book.synopsis?.stripHtml(),
             number = book.number,
             releaseDate = book.availableSince,
             authors = getAuthors(book),
@@ -153,6 +154,8 @@ class BookWalkerMapper(
     /** `adult` is the only rating signal the export carries. */
     private fun BookWalkerSeries.ageRating(): Int? =
         if (flags.any { it.equals("adult", ignoreCase = true) }) 18 else null
+
+    private fun String.stripHtml(): String = Ksoup.parse(this).wholeText()
 
     private fun seriesUrl(seriesId: BookWalkerSeriesId) = "$bookWalkerBaseUrl/series/${seriesId.id}"
 
