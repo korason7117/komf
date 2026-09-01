@@ -137,6 +137,8 @@ class AppConfigUpdateMapper {
                 ?.let { aniListProviderConfig(config.aniList, it) } ?: config.aniList,
             yenPress = patch.yenPress.getOrNull()
                 ?.let { providerConfig(config.yenPress, it) } ?: config.yenPress,
+            kodansha = patch.kodansha.getOrNull()
+                ?.let { providerConfig(config.kodansha, it) } ?: config.kodansha,
             viz = patch.viz.getOrNull()
                 ?.let { providerConfig(config.viz, it) } ?: config.viz,
             bookWalker = patch.bookWalker.getOrNull()

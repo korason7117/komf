@@ -73,7 +73,6 @@ enum class KomfCoreProviders : KomfProviders {
     WEBTOONS,
     @Deprecated("Removed")
     NAUTILJON,
-    @Deprecated("Removed")
     KODANSHA,
 }
 

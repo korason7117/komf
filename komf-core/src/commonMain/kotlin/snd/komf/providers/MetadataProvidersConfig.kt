@@ -43,6 +43,7 @@ data class ProvidersConfig(
     val aniList: AniListConfig = AniListConfig(),
     val mal: ProviderConfig = ProviderConfig(),
     val comicVine: ProviderConfig = ProviderConfig(),
+    val kodansha: ProviderConfig = ProviderConfig(),
 
     @Deprecated("to be removed")
     val yenPress: ProviderConfig = ProviderConfig(),

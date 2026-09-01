@@ -172,7 +172,7 @@ class AppConfigMapper {
 
             nautiljon = toDto(ProviderConfig()),
             yenPress = toDto(config.yenPress),
-            kodansha = toDto(ProviderConfig()),
+            kodansha = toDto(config.kodansha),
             viz = toDto(config.viz),
             bangumi = toDto(config.bangumi),
             hentag = toDto(ProviderConfig()),
