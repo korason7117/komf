@@ -53,11 +53,11 @@ class MangaBakaMetadataMapper(
             ?: emptySet()
 
 
-        val allTitles = series.titles?.sortedByDescending { it.isPrimary } ?: emptyList()
+        val allTitles = series.titles?.filter { it.isPrimary == true } ?: emptyList()
         val nativeTitle = allTitles.firstOrNull { title ->
             title.traits.any { it == NATIVE } && !title.language.endsWith("-Latn")
         }
-        val titles = allTitles.sortedByDescending { it.isPrimary }.map { title ->
+        val titles = allTitles.map { title ->
             val romanized = title.title.endsWith("-Latn")
             SeriesTitle(
                 name = title.title,
