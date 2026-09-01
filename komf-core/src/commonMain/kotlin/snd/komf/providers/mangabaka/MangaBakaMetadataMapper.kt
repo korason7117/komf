@@ -28,6 +28,7 @@ class MangaBakaMetadataMapper(
     private val metadataConfig: SeriesMetadataConfig,
     private val authorRoles: Collection<AuthorRole>,
     private val artistRoles: Collection<AuthorRole>,
+    private val linkLanguages: List<String>,
 ) {
 
     fun toSeriesMetadata(series: MangaBakaSeries, thumbnail: Image? = null): ProviderSeriesMetadata {
@@ -73,14 +74,16 @@ class MangaBakaMetadataMapper(
         val publisher = if (metadataConfig.useOriginalPublisher) originalPublishers.firstOrNull()
         else englishPublishers.firstOrNull() ?: originalPublishers.firstOrNull()
 
-        val links = series.linksV2?.mapNotNull { link ->
-            parseUrl(link.url)?.let { url ->
-                WebLink(
-                    link.nameDisplay,
-                    url.toStingEncoded()
-                )
-            }
-        }?.sortedBy { it.label } ?: emptyList()
+        val links = series.linksV2
+            ?.filter { linkLanguages.isEmpty() || it.language == "unknown" || it.language in linkLanguages }
+            ?.mapNotNull { link ->
+                parseUrl(link.url)?.let { url ->
+                    WebLink(
+                        link.nameDisplay,
+                        url.toStingEncoded()
+                    )
+                }
+            }?.sortedBy { it.label } ?: emptyList()
         val allLinks = listOf(WebLink("MangaBaka", series.url())) + links
 
         val allTags = series.tagsV2 ?: emptyList()

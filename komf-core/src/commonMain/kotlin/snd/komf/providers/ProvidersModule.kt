@@ -74,6 +74,8 @@ class ProvidersModule(
     private val baseHttpClient: HttpClient,
     mangaBakaDatabase: Database?,
     bookWalkerDatabase: BookWalkerDatabase,
+    private val defaultAltTitleLanguages: List<String> = emptyList(),
+    private val libraryAltTitleLanguages: Map<String, List<String>> = emptyMap(),
 ) {
 
     private val json = Json {
@@ -101,11 +103,14 @@ class ProvidersModule(
             comicVineIssueName = config.comicVineIssueName,
             comicVineIdFormat = config.comicVineIdFormat,
             bangumiToken = config.bangumiToken,
+            altTitleLanguages = defaultAltTitleLanguages,
         )
-        val libraryProviders = config.libraryProviders
-            .map { (libraryId, libraryConfig) ->
-                libraryId to createMetadataProviders(
-                    config = libraryConfig,
+        // libraries with their own alternative title languages need their own providers
+        // even when they have no provider config overrides
+        val libraryProviders = (config.libraryProviders.keys + libraryAltTitleLanguages.keys)
+            .associateWith { libraryId ->
+                createMetadataProviders(
+                    config = config.libraryProviders[libraryId] ?: config.defaultProviders,
                     defaultNameMatcher = defaultNameMatcher,
                     malClientId = config.malClientId,
                     comicVineClientId = config.comicVineApiKey,
@@ -113,9 +118,9 @@ class ProvidersModule(
                     comicVineIssueName = config.comicVineIssueName,
                     comicVineIdFormat = config.comicVineIdFormat,
                     bangumiToken = config.bangumiToken,
+                    altTitleLanguages = libraryAltTitleLanguages[libraryId] ?: defaultAltTitleLanguages,
                 )
             }
-            .toMap()
 
         return MetadataProviders(defaultProviders, libraryProviders)
     }
@@ -279,6 +284,7 @@ class ProvidersModule(
         comicVineIssueName: String?,
         comicVineIdFormat: String?,
         bangumiToken: String?,
+        altTitleLanguages: List<String>,
     ): MetadataProvidersContainer {
         return MetadataProvidersContainer(
             mangaupdates = createMangaUpdatesMetadataProvider(
@@ -346,7 +352,8 @@ class ProvidersModule(
                     MangaBakaMode.DATABASE -> mangaBakaDbDataSource
                 },
                 coverFetchClient = mangaBakaCoverFetchClient,
-                defaultNameMatcher = defaultNameMatcher
+                defaultNameMatcher = defaultNameMatcher,
+                linkLanguages = altTitleLanguages,
             ),
             mangaBakaPriority = config.mangaBaka.priority,
             webtoons = createWebtoonsMetadataProvider(
@@ -630,6 +637,7 @@ class ProvidersModule(
         datasource: MangaBakaDataSource?,
         coverFetchClient: HttpClient,
         defaultNameMatcher: NameSimilarityMatcher,
+        linkLanguages: List<String>,
     ): MangaBakaMetadataProvider? {
         if (config.enabled.not()) return null
         if (datasource == null) {
@@ -643,6 +651,7 @@ class ProvidersModule(
                 metadataConfig = config.seriesMetadata,
                 authorRoles = config.authorRoles,
                 artistRoles = config.artistRoles,
+                linkLanguages = linkLanguages,
             ),
             nameMatcher = config.nameMatchingMode?.let { nameSimilarityMatcher(it) } ?: defaultNameMatcher,
             coverFetchClient = coverFetchClient,

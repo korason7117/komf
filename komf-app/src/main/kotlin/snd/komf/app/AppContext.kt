@@ -91,11 +91,7 @@ class AppContext(private val configPath: Path? = null) {
             install(UserAgent) { agent = komfUserAgent }
         }
 
-        providersModule = CoreModule(
-            config = config.metadataProviders,
-            ktor = ktorBaseClient,
-            onStateRefresh = this::refreshState,
-        )
+        providersModule = createCoreModule(config)
         notificationsModule = NotificationsModule(config.notifications, ktorBaseClient)
 
         mediaServerModule = MediaServerModule(
@@ -133,14 +129,20 @@ class AppContext(private val configPath: Path? = null) {
         }
     }
 
+    private fun createCoreModule(config: AppConfig) = CoreModule(
+        config = config.metadataProviders,
+        ktor = ktorBaseClient,
+        onStateRefresh = this::refreshState,
+        defaultAltTitleLanguages = (config.komga.metadataUpdate.default.postProcessing.alternativeSeriesTitleLanguages +
+                config.kavita.metadataUpdate.default.postProcessing.alternativeSeriesTitleLanguages).distinct(),
+        libraryAltTitleLanguages = (config.komga.metadataUpdate.library + config.kavita.metadataUpdate.library)
+            .mapValues { (_, processingConfig) -> processingConfig.postProcessing.alternativeSeriesTitleLanguages },
+    )
+
     private fun reloadModules(config: AppConfig) {
         logger.info { "Reconfiguring application state" }
 
-        val providersModule = CoreModule(
-            config = config.metadataProviders,
-            ktor = ktorBaseClient,
-            onStateRefresh = this::refreshState,
-        )
+        val providersModule = createCoreModule(config)
         val notificationsModule = NotificationsModule(config.notifications, ktorBaseClient)
         val mediaServerModule = MediaServerModule(
             komgaConfig = config.komga,

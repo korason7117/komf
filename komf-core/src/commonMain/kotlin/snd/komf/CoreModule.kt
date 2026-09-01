@@ -19,6 +19,8 @@ class CoreModule(
     private val config: MetadataProvidersConfig,
     ktor: HttpClient,
     onStateRefresh: suspend () -> Unit,
+    defaultAltTitleLanguages: List<String> = emptyList(),
+    libraryAltTitleLanguages: Map<String, List<String>> = emptyMap(),
 ) {
     private val baseHttpClient = ktor.config {
         expectSuccess = true
@@ -67,6 +69,12 @@ class CoreModule(
         dbMetadata = bookWalkerDbMetadata
     )
 
-    val metadataProviders =
-        ProvidersModule(config, baseHttpClient, mangaBakaDatabase, bookWalkerDatabase).getMetadataProviders()
+    val metadataProviders = ProvidersModule(
+        config,
+        baseHttpClient,
+        mangaBakaDatabase,
+        bookWalkerDatabase,
+        defaultAltTitleLanguages,
+        libraryAltTitleLanguages,
+    ).getMetadataProviders()
 }
