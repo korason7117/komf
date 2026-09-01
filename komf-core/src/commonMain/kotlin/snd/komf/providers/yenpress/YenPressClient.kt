@@ -63,6 +63,14 @@ class YenPressClient(
             nextOrd = batch.nextOrd
             requestCount++
         }
+
+        // get_more endpoint returns an empty response for single volume series.
+        // books are listed directly on the series page in that case
+        if (allBooks.isEmpty()) {
+            val document = ktor.get("${yenPressBaseUrl}series/${id.value}").bodyAsText()
+            allBooks.addAll(parser.parseSeriesPageBooks(document))
+        }
+
         return allBooks.sortedBy { it.number?.start }
     }
 

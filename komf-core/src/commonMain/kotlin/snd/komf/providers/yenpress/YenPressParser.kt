@@ -1,6 +1,7 @@
 package snd.komf.providers.yenpress
 
 import com.fleeksoft.ksoup.Ksoup
+import com.fleeksoft.ksoup.nodes.Element
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.format.MonthNames
 import kotlinx.datetime.format.char
@@ -96,18 +97,7 @@ class YenPressParser {
 
     fun parseMoreBooksResponse(booksDocument: String): YenPressMoreBooksResponse {
         val document = Ksoup.parse(booksDocument)
-        val books = document.getElementsByClass("inline_block")
-            .map {
-                val link = it.child(0)
-                val bookId = YenPressBookId(link.attr("href").removePrefix("/titles/"))
-                val name = link.child(1).text()
-
-                YenPressBookShort(
-                    id = bookId,
-                    number = BookNameParser.getVolumes(name) ?: BookNameParser.getBookNumber(name),
-                    name = name,
-                )
-            }
+        val books = parseBookListItems(document)
         val nextOrd = document.getElementsByClass("show-more")
             .firstOrNull()
             ?.attr("data-url")
@@ -118,6 +108,33 @@ class YenPressParser {
             books = books,
             nextOrd = nextOrd
         )
+    }
+
+    // single volume series pages list their only book directly on the page
+    // instead of returning it from the get_more endpoint
+    fun parseSeriesPageBooks(seriesPage: String): List<YenPressBookShort> {
+        val document = Ksoup.parse(seriesPage)
+        return document.getElementsByClass("show-more-container").firstOrNull()
+            ?.let { parseBookListItems(it) }
+            ?: emptyList()
+    }
+
+    private fun parseBookListItems(element: Element): List<YenPressBookShort> {
+        return element.getElementsByClass("inline_block")
+            .mapNotNull { block ->
+                val link = block.getElementsByTag("a").firstOrNull() ?: return@mapNotNull null
+                val href = link.attr("href")
+                if (!href.startsWith("/titles/")) return@mapNotNull null
+
+                val bookId = YenPressBookId(href.removePrefix("/titles/"))
+                val name = link.getElementsByTag("p").firstOrNull()?.text() ?: return@mapNotNull null
+
+                YenPressBookShort(
+                    id = bookId,
+                    number = BookNameParser.getVolumes(name) ?: BookNameParser.getBookNumber(name),
+                    name = name,
+                )
+            }
     }
 
     fun parseSearchKey(search: String): String {
