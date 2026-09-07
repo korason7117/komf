@@ -96,6 +96,7 @@ data class MetadataProvidersConfigDto(
     val defaultProviders: ProvidersConfigDto,
     val libraryProviders: Map<String, ProvidersConfigDto>,
     val mangaBakaDatabase: MangaBakaDatabaseDto?,
+    val bookWalkerDownloadDate: Instant?,
 )
 
 @Serializable
