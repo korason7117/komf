@@ -50,9 +50,9 @@ private const val EXTERNAL_ID_ISBN = 3
  *
  * ### Ordering
  *
- * Volumes are ordered by `display_order` only. `level` and `content_type` look
- * like they should identify volumes but are not consistent between series (the
- * same field is 2 for one series and 3 for another), so they are not used.
+ * Volumes are ordered by `display_order` only. `content_type` looks like it
+ * should identify volumes but is not consistent between series, so it is not
+ * used. `level` is — see [SERIES_BOOKS_SQL].
  *
  * ### Volume names
  *
@@ -118,8 +118,8 @@ class BookWalkerDbDataSource(
             val genres = seriesTagNames(rowId, NAMESPACE_GENRE)
             val tags = seriesTagNames(rowId, NAMESPACE_TAG)
             val flags = seriesTagNames(rowId, NAMESPACE_FLAG)
-            val books = query(SERIES_BOOKS_SQL, listOf(rowId)) { rs -> toSeriesBook(rs) }
-            val imprint = query(SERIES_IMPRINT_SQL, listOf(rowId)) { rs ->
+            val books = query(SERIES_BOOKS_SQL, listOf(rowId, rowId)) { rs -> toSeriesBook(rs) }
+            val imprint = query(SERIES_IMPRINT_SQL, listOf(rowId, rowId)) { rs ->
                 rs.getString("label") to rs.getString("publisher")
             }.firstOrNull()
 
@@ -421,16 +421,17 @@ private val SERIES_BOOKS_SQL = """
     SELECT p.content_id, p.title, p.display_title, p.display_order
     FROM products p
     WHERE p.series_id = ?
+      AND p.level = (SELECT MIN(level) FROM products WHERE series_id = ?)
     ORDER BY p.display_order
 """.trimIndent()
 
-/** Imprint/publisher for a series, taken from its earliest volume. */
 private val SERIES_IMPRINT_SQL = """
     SELECT l.name AS label, pub.display_name AS publisher
     FROM products p
     JOIN labels l ON l.id = p.label_id
     LEFT JOIN publishers pub ON pub.id = l.publisher_id
     WHERE p.series_id = ?
+      AND p.level = (SELECT MIN(level) FROM products WHERE series_id = ?)
     ORDER BY p.display_order
     LIMIT 1
 """.trimIndent()
