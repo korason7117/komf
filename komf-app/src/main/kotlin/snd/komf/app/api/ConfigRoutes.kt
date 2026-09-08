@@ -21,6 +21,7 @@ import snd.komf.api.config.KomfConfigUpdateRequest
 import snd.komf.app.api.mappers.AppConfigMapper
 import snd.komf.app.api.mappers.AppConfigUpdateMapper
 import snd.komf.app.config.AppConfig
+import snd.komf.providers.bookwalker.db.BookWalkerDbMetadata
 import snd.komf.providers.mangabaka.db.MangaBakaDbDownloader
 import snd.komf.providers.mangabaka.db.MangaBakaDbMetadata
 import snd.komf.providers.mangabaka.db.MangaBakaDownloadProgress.ErrorEvent
@@ -34,6 +35,7 @@ class ConfigRoutes(
     private val onConfigUpdate: suspend (AppConfig) -> Unit,
     private val mangaBakaDownloader: Flow<MangaBakaDbDownloader>,
     private val mangaBakaDbMetadata: Flow<MangaBakaDbMetadata>,
+    private val bookWalkerDbMetadata: Flow<BookWalkerDbMetadata>,
     private val json: Json,
 ) {
     private val configMapper = AppConfigMapper()
@@ -53,7 +55,8 @@ class ConfigRoutes(
             call.respond(
                 configMapper.toDto(
                     config = config.first(),
-                    mangaBakaDbMetadata = mangaBakaDbMetadata.first()
+                    mangaBakaDbMetadata = mangaBakaDbMetadata.first(),
+                    bookWalkerDbTimestamp = bookWalkerDbMetadata.first().timestamp,
                 )
             )
         }

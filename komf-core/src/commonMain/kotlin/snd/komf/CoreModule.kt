@@ -48,7 +48,7 @@ class CoreModule(
         else Database.connect("jdbc:sqlite:$mangaBakaDatabaseFile")
 
     private val bookWalkerDir = Path(config.bookwalkerDatabaseDir)
-    private val bookWalkerDbMetadata = BookWalkerDbMetadata(
+    val bookWalkerDbMetadata = BookWalkerDbMetadata(
         bookWalkerDir.resolve("timestamp"),
         bookWalkerDir.resolve("validator"),
         bookWalkerDir.resolve("database")

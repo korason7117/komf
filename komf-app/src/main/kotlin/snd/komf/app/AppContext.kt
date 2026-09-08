@@ -176,7 +176,8 @@ class AppContext(private val configPath: Path? = null) {
         appriseService = notificationsModule.appriseService,
         appriseRenderer = notificationsModule.appriseVelocityRenderer,
         mangaBakaDownloader = providersModule.mangaBakaDatabaseDownloader,
-        mangaBakaDbMetadata = providersModule.mangaBakaDbMetadata
+        mangaBakaDbMetadata = providersModule.mangaBakaDbMetadata,
+        bookWalkerDbMetadata = providersModule.bookWalkerDbMetadata,
     )
 
     private suspend fun writeConfig(config: AppConfig) {
